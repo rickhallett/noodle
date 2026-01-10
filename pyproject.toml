@@ -1,0 +1,62 @@
+[project]
+name = "noodle"
+version = "0.1.0"
+description = "Local-first second brain for Arch Linux"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "kai" }]
+
+# Minimal dependencies for fast startup
+dependencies = [
+    "tomli>=2.0",  # Config parsing (stdlib in 3.11+ but we want toml write too)
+]
+
+[project.optional-dependencies]
+# Phase 1: Classification
+classify = [
+    "httpx>=0.27",
+    "pydantic>=2.0",
+]
+# Phase 2: Surfacing
+surface = [
+    "rich>=13.0",
+]
+# Phase 3: MCP
+mcp = [
+    "mcp>=0.1",
+]
+# Phase 4: Telegram
+telegram = [
+    "python-telegram-bot>=21.0",
+]
+# Phase 5: TUI
+tui = [
+    "textual>=0.50",
+]
+# All features
+all = [
+    "noodle[classify,surface,mcp,telegram,tui]",
+]
+# Development
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.1",
+]
+
+[project.scripts]
+noodle = "noodle.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/noodle"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]

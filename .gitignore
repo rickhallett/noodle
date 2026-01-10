@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# uv / venv
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Noodle data (lives in ~/noodle, not repo)
+# But if someone sets NOODLE_HOME to repo dir:
+inbox.log
+processed.log
+manual_review.md
+noodle.db
