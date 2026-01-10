@@ -1,0 +1,8 @@
+[Unit]
+Description=Generate Noodle daily digest
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/noodle digest
+Environment="PATH=%h/.local/bin:/usr/bin"
+StandardOutput=journal

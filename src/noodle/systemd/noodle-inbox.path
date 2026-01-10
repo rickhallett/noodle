@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch Noodle inbox for new entries
+
+[Path]
+PathModified=%h/noodle/inbox.log
+Unit=noodle-inbox.service
+
+[Install]
+WantedBy=default.target

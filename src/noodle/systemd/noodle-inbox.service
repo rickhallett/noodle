@@ -1,0 +1,7 @@
+[Unit]
+Description=Process Noodle inbox
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/noodle process-inbox
+Environment="PATH=%h/.local/bin:/usr/bin"

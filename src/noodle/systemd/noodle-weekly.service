@@ -1,0 +1,8 @@
+[Unit]
+Description=Generate Noodle weekly review
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/noodle weekly
+Environment="PATH=%h/.local/bin:/usr/bin"
+StandardOutput=journal
