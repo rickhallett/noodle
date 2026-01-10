@@ -33,7 +33,7 @@ class ClassifiedEntry(BaseModel):
 
 # Default models for each provider
 DEFAULT_MODELS = {
-    "anthropic": "claude-3-5-haiku-20241022",  # Fast and cheap for classification
+    "anthropic": "claude-haiku-4-5-20251001",  # Fast and cheap for classification
     "openai": "gpt-4o-mini",
 }
 
@@ -205,7 +205,18 @@ class Classifier:
     def _parse_response(self, response: str, raw_input: str) -> dict[str, Any]:
         """Parse and validate LLM response."""
         try:
-            data = json.loads(response)
+            # Strip markdown code blocks if present
+            text = response.strip()
+            if text.startswith("```"):
+                # Remove opening ``` and optional language tag
+                lines = text.split("\n")
+                lines = lines[1:]  # Remove first line (```json)
+                # Remove closing ```
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                text = "\n".join(lines)
+
+            data = json.loads(text)
 
             # Validate with Pydantic
             entry = ClassifiedEntry(**data)

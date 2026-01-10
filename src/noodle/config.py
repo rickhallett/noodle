@@ -78,6 +78,6 @@ def get_default_config() -> dict[str, Any]:
         },
         "llm": {
             "provider": "anthropic",  # or "openai"
-            "model": "claude-3-5-haiku-20241022",  # Fast and cheap for classification
+            "model": "claude-haiku-4-5-20251001",  # Fast and cheap for classification
         },
     }
