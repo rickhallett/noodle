@@ -2,6 +2,7 @@
 LLM Classifier for Noodle.
 
 Routes raw thoughts into the four buckets: task, thought, person, event.
+Supports both Anthropic and OpenAI APIs.
 """
 
 import json
@@ -28,6 +29,13 @@ class ClassifiedEntry(BaseModel):
     people: list[str] = Field(default_factory=list, description="Referenced people slugs")
     due_date: str | None = Field(default=None, description="ISO date for tasks/events")
     priority: str | None = Field(default=None, description="low, medium, or high")
+
+
+# Default models for each provider
+DEFAULT_MODELS = {
+    "anthropic": "claude-3-5-haiku-20241022",  # Fast and cheap for classification
+    "openai": "gpt-4o-mini",
+}
 
 
 CLASSIFIER_PROMPT = """You are a classifier for a personal knowledge management system called Noodle.
@@ -88,19 +96,38 @@ Return ONLY the JSON object, no explanation or markdown."""
 
 
 class Classifier:
-    """LLM-powered classifier for routing thoughts."""
+    """LLM-powered classifier for routing thoughts. Supports Anthropic and OpenAI."""
 
     def __init__(self, config: dict[str, Any] | None = None):
         self.config = config or load_config()
         self.llm_config = self.config.get("llm", {})
-        self.api_key = self.llm_config.get("openai_api_key") or os.environ.get("OPENAI_API_KEY")
-        self.model = self.llm_config.get("model", "gpt-4o-mini")
-        self.base_url = self.llm_config.get("base_url", "https://api.openai.com/v1")
 
-        if not self.api_key:
-            raise ValueError(
-                "OpenAI API key not found. Set OPENAI_API_KEY env var or add to config."
+        # Determine provider (anthropic is default, check for keys)
+        self.provider = self.llm_config.get("provider", "anthropic")
+
+        # Get API key based on provider
+        if self.provider == "anthropic":
+            self.api_key = (
+                self.llm_config.get("anthropic_api_key")
+                or os.environ.get("ANTHROPIC_API_KEY")
             )
+            self.model = self.llm_config.get("model", DEFAULT_MODELS["anthropic"])
+            self.base_url = "https://api.anthropic.com/v1"
+            if not self.api_key:
+                raise ValueError(
+                    "Anthropic API key not found. Set ANTHROPIC_API_KEY env var or add to config."
+                )
+        else:  # openai
+            self.api_key = (
+                self.llm_config.get("openai_api_key")
+                or os.environ.get("OPENAI_API_KEY")
+            )
+            self.model = self.llm_config.get("model", DEFAULT_MODELS["openai"])
+            self.base_url = self.llm_config.get("base_url", "https://api.openai.com/v1")
+            if not self.api_key:
+                raise ValueError(
+                    "OpenAI API key not found. Set OPENAI_API_KEY env var or add to config."
+                )
 
     def classify(self, raw_input: str) -> dict[str, Any]:
         """
@@ -115,7 +142,11 @@ class Classifier:
         prompt = CLASSIFIER_PROMPT.format(input=raw_input, today=today)
 
         try:
-            response = self._call_openai(prompt)
+            if self.provider == "anthropic":
+                response = self._call_anthropic(prompt)
+            else:
+                response = self._call_openai(prompt)
+
             parsed = self._parse_response(response, raw_input)
             processing_time = int((time.time() - start_time) * 1000)
 
@@ -131,6 +162,26 @@ class Classifier:
             processing_time = int((time.time() - start_time) * 1000)
             # Graceful fallback - never lose the thought
             return self._fallback_classification(raw_input, str(e), processing_time)
+
+    def _call_anthropic(self, prompt: str) -> str:
+        """Call Anthropic API."""
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post(
+                f"{self.base_url}/messages",
+                headers={
+                    "x-api-key": self.api_key,
+                    "Content-Type": "application/json",
+                    "anthropic-version": "2023-06-01",
+                },
+                json={
+                    "model": self.model,
+                    "max_tokens": 1024,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.3,  # Lower temp for consistent classification
+                },
+            )
+            response.raise_for_status()
+            return response.json()["content"][0]["text"]
 
     def _call_openai(self, prompt: str) -> str:
         """Call OpenAI API."""

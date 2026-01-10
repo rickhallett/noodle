@@ -77,7 +77,7 @@ def get_default_config() -> dict[str, Any]:
             "confidence_threshold": 0.75,
         },
         "llm": {
-            "provider": "openai",
-            "model": "gpt-4o-mini",
+            "provider": "anthropic",  # or "openai"
+            "model": "claude-3-5-haiku-20241022",  # Fast and cheap for classification
         },
     }
