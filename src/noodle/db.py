@@ -161,8 +161,16 @@ class Database:
     def insert_entry(self, entry: dict[str, Any]) -> str:
         """Insert a classified entry. Returns entry ID."""
         now = datetime.now(timezone.utc).isoformat()
+        project_id = entry.get("project")
 
         with self._connect() as conn:
+            # Auto-create project if it doesn't exist
+            if project_id:
+                conn.execute("""
+                    INSERT OR IGNORE INTO projects (id, name, created_at, updated_at)
+                    VALUES (?, ?, ?, ?)
+                """, (project_id, project_id.replace("-", " ").title(), now, now))
+
             conn.execute("""
                 INSERT INTO entries (
                     id, created_at, updated_at, type, title, body,
@@ -179,7 +187,7 @@ class Database:
                 entry["confidence"],
                 entry.get("priority"),
                 entry.get("due_date"),
-                entry.get("project"),
+                project_id,
                 entry.get("source", "cli"),
                 entry["raw_input"],
                 entry.get("needs_reclassification", 0),
