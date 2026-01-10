@@ -106,12 +106,52 @@ uv add --dev pytest
 uv run pytest
 ```
 
+## Claude Code Integration
+
+Noodle includes an MCP server for Claude Code integration.
+
+### Setup
+
+Add to your Claude Code settings (`~/.config/claude-code/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "noodle": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/noodle", "python", "-m", "noodle_mcp.server"]
+    }
+  }
+}
+```
+
+### Slash Commands
+
+- `/noodle "thought"` — Capture a thought
+- `/noodle-find query` — Search entries
+- `/noodle-context topic` — Get related entries
+- `/noodle-tasks` — Show tasks
+- `/noodle-digest` — Show daily digest
+- `/noodle-review` — Review low-confidence entries
+
+### MCP Tools
+
+- `noodle_add` — Capture a thought
+- `noodle_search` — Full-text search
+- `noodle_tasks` — List tasks
+- `noodle_complete` — Complete a task
+- `noodle_digest` — Daily digest
+- `noodle_weekly` — Weekly review
+- `noodle_context` — Related entries
+- `noodle_pending` — Review queue
+- `noodle_retype` — Change entry type
+
 ## Roadmap
 
 - [x] **Phase 0**: Foundation — `noodle "thought"` works
-- [ ] **Phase 1**: Classification — LLM auto-categorizes
-- [ ] **Phase 2**: Surfacing — digests, search, systemd timers
-- [ ] **Phase 3**: Integration — Claude Code MCP server
+- [x] **Phase 1**: Classification — LLM auto-categorizes
+- [x] **Phase 2**: Surfacing — digests, search, systemd timers
+- [x] **Phase 3**: Integration — Claude Code MCP server
 - [ ] **Phase 4**: Mobile — Telegram bot
 - [ ] **Phase 5**: Polish — TUI, health checks, docs
 

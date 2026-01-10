@@ -2,6 +2,10 @@
 
 This file provides context for Claude Code when working on this project.
 
+## CRITICAL: Commit Messages
+
+**DO NOT include AI attribution in commit messages.** No "Generated with Claude Code", no "Co-Authored-By: Claude" lines. Just write clean commit messages.
+
 ## Project Overview
 
 Noodle is a local-first second brain for Arch Linux. It captures thoughts with zero friction and uses LLM classification to route them into four buckets: `task`, `thought`, `person`, `event`.
