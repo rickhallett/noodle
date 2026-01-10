@@ -21,13 +21,21 @@ An LLM classifier sorts your raw thoughts into four buckets — tasks, ideas, pe
 
 ## Philosophy
 
-Noodle is not an app. It's a **hardware upgrade for an ancient processor**.
+Most productivity systems fail because they demand too much at the wrong moment. When a thought strikes, you're asked to categorize it, prioritize it, file it in the right project. That friction kills capture. The thought evaporates while you're deciding where it belongs.
 
-- **O(1) Ingress**: Zero decisions at capture. Just `noodle "thought"`.
-- **Four Buckets**: `task`, `thought`, `person`, `event`. No more, ever.
-- **Push Over Pull**: The system surfaces info to you via digests and notifications.
-- **No Guilt**: Rolling time windows. Miss a week? No backlog monster.
-- **Trust Guarantee**: Every captured thought WILL be processed.
+Noodle inverts this. Capture is instant and thoughtless — just dump the raw text. Classification happens later, in the background, by an LLM that doesn't mind doing the boring work. You never organize; you only capture and retrieve.
+
+The system is built on a few hard constraints:
+
+**O(1) Ingress** — The capture command must complete in under 100ms with zero user decisions. No flags, no menus, no "what type is this?" prompts. If capture requires thought, you'll avoid it.
+
+**Four Buckets** — Everything is a task, thought, person, or event. This taxonomy is frozen forever. The temptation to add "project" or "reference" or "someday/maybe" is how systems bloat into unusability. Extend via tags, never via new types.
+
+**Push Over Pull** — You shouldn't have to remember to check your system. The daily digest tells you what's due. Notifications surface what needs attention. Search exists, but it's secondary to the system proactively tapping you on the shoulder.
+
+**No Guilt** — Weekly reviews look at the last 7 days, not "everything you've ever failed to do." There's no backlog. Miss a week? Start fresh. The system is designed for humans who fall off wagons.
+
+**Trust Guarantee** — Every captured thought will be processed, even if the LLM is down, even if classification fails. Low-confidence items go to a review queue, not the void. You can dump thoughts without anxiety about whether they'll be lost.
 
 ## Quick Start
 
