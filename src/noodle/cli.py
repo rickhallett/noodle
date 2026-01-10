@@ -24,8 +24,12 @@ Commands:
     noodle list [options]         List entries (--type, --project, --all)
     noodle find <query>           Full-text search
     noodle done <id>              Mark a task as completed
+    noodle retype <id> <type>     Change entry type
     noodle digest                 Show daily digest
     noodle weekly                 Show weekly review
+    noodle review                 Interactive review of pending items
+    noodle health                 System health check
+    noodle gc                     Garbage collection
     noodle process-inbox          Process inbox through classifier
     noodle stats                  Show database statistics
     noodle telegram               Run Telegram bot
@@ -309,6 +313,119 @@ def cmd_weekly() -> int:
         return 1
 
 
+def cmd_health() -> int:
+    """Show system health."""
+    from noodle.health import run_health_check, format_health_report
+
+    checks = run_health_check()
+    print(format_health_report(checks))
+    return 0
+
+
+def cmd_retype(args: list[str]) -> int:
+    """Change entry type."""
+    from noodle.db import Database
+
+    if len(args) < 2:
+        print("Usage: noodle retype <id> <type>", file=sys.stderr)
+        print("Types: task, thought, person, event", file=sys.stderr)
+        return 1
+
+    entry_id = args[0]
+    new_type = args[1]
+
+    if new_type not in ("task", "thought", "person", "event"):
+        print(f"Invalid type: {new_type}", file=sys.stderr)
+        print("Types: task, thought, person, event", file=sys.stderr)
+        return 1
+
+    try:
+        db = Database()
+        success = db.update_entry_type(entry_id, new_type)
+        if success:
+            print(f"Retyped: {entry_id} → {new_type}")
+            return 0
+        else:
+            print(f"Entry not found: {entry_id}", file=sys.stderr)
+            return 1
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_review() -> int:
+    """Interactive review of pending items."""
+    from noodle.db import Database
+
+    db = Database()
+    entries = db.get_pending_reclassification()
+
+    if not entries:
+        print("No entries pending review.")
+        return 0
+
+    print(f"Pending review: {len(entries)} items\n")
+
+    for entry in entries:
+        print(f"ID: {entry['id']}")
+        print(f"Current: {entry['type']}")
+        print(f"Title: {entry['title']}")
+        if entry.get('body'):
+            print(f"Body: {entry['body'][:100]}...")
+        print()
+
+        # Prompt for action
+        action = input("[t]ask [h]ought [p]erson [e]vent [s]kip [q]uit: ").strip().lower()
+
+        if action == 'q':
+            break
+        elif action == 's':
+            continue
+        elif action in ('t', 'task'):
+            db.update_entry_type(entry['id'], 'task')
+            print("→ task\n")
+        elif action in ('h', 'thought'):
+            db.update_entry_type(entry['id'], 'thought')
+            print("→ thought\n")
+        elif action in ('p', 'person'):
+            db.update_entry_type(entry['id'], 'person')
+            print("→ person\n")
+        elif action in ('e', 'event'):
+            db.update_entry_type(entry['id'], 'event')
+            print("→ event\n")
+
+    return 0
+
+
+def cmd_gc() -> int:
+    """Garbage collection and cleanup."""
+    from noodle.db import Database
+    from noodle.config import get_noodle_home
+
+    print("Running garbage collection...")
+
+    # Clean up processed.log entries that are in the database
+    noodle_home = get_noodle_home()
+    processed_path = noodle_home / "processed.log"
+
+    if processed_path.exists():
+        # Count lines before
+        with open(processed_path) as f:
+            before = sum(1 for _ in f)
+        print(f"  Processed log: {before} entries")
+
+    # Check for orphaned entries
+    db = Database()
+    stats = db.get_stats()
+    pending = stats.get("pending_reclassification", 0)
+
+    if pending > 0:
+        print(f"  Pending review: {pending} items")
+
+    print("Done.")
+    return 0
+
+
 def cmd_install_systemd() -> int:
     """Install systemd user units."""
     from pathlib import Path
@@ -402,6 +519,18 @@ def main() -> int:
 
     if first_arg == "weekly":
         return cmd_weekly()
+
+    if first_arg == "health":
+        return cmd_health()
+
+    if first_arg == "retype":
+        return cmd_retype(args[1:])
+
+    if first_arg == "review":
+        return cmd_review()
+
+    if first_arg == "gc":
+        return cmd_gc()
 
     if first_arg == "install-systemd":
         return cmd_install_systemd()
