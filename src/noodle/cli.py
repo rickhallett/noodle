@@ -28,6 +28,7 @@ Commands:
     noodle weekly                 Show weekly review
     noodle process-inbox          Process inbox through classifier
     noodle stats                  Show database statistics
+    noodle telegram               Run Telegram bot
     noodle install-systemd        Install systemd user units
 
 Options:
@@ -103,22 +104,32 @@ def cmd_process_inbox() -> int:
                     processed_ids.add(parts[0])
 
     # Parse inbox entries
+    # Format: id\ttimestamp\tsource\ttext (4 fields)
+    # Legacy format: id\ttimestamp\ttext (3 fields, source defaults to cli)
     pending = []
     for line in lines:
         line = line.strip()
         if not line:
             continue
-        parts = line.split("\t", 2)
-        if len(parts) >= 3:
+        parts = line.split("\t", 3)
+        if len(parts) >= 4:
+            entry_id, timestamp, source, text = parts
+        elif len(parts) >= 3:
+            # Legacy format without source
             entry_id, timestamp, text = parts
-            if entry_id not in processed_ids:
-                # Unescape text
-                text = text.replace("\\n", "\n").replace("\\t", "\t")
-                pending.append({
-                    "id": entry_id,
-                    "created_at": timestamp,
-                    "text": text,
-                })
+            source = "cli"
+        else:
+            continue
+
+        if entry_id not in processed_ids:
+            # Unescape text
+            text = text.replace("\\n", "\n").replace("\\t", "\t")
+            pending.append({
+                "id": entry_id,
+                "created_at": timestamp,
+                "source": source,
+                "text": text,
+            })
 
     if not pending:
         print("All inbox items already processed.")
@@ -145,6 +156,7 @@ def cmd_process_inbox() -> int:
             result = classifier.classify(item["text"])
             result["id"] = item["id"]
             result["created_at"] = item["created_at"]
+            result["source"] = item.get("source", "cli")
 
             # Route
             routed = router.route(result)
@@ -319,6 +331,7 @@ def cmd_install_systemd() -> int:
         "noodle-digest.service",
         "noodle-weekly.timer",
         "noodle-weekly.service",
+        "noodle-telegram.service",
     ]
 
     for unit in units:
@@ -332,6 +345,7 @@ def cmd_install_systemd() -> int:
     print("  systemctl --user enable --now noodle-inbox.path")
     print("  systemctl --user enable --now noodle-digest.timer")
     print("  systemctl --user enable --now noodle-weekly.timer")
+    print("  systemctl --user enable --now noodle-telegram.service  # requires NOODLE_TELEGRAM_TOKEN")
 
     return 0
 
@@ -391,6 +405,10 @@ def main() -> int:
 
     if first_arg == "install-systemd":
         return cmd_install_systemd()
+
+    if first_arg == "telegram":
+        from noodle.telegram_bot import main as telegram_main
+        return telegram_main()
 
     # Everything else is a thought to capture
     # Join all args (allows: noodle Remember to email Sarah)

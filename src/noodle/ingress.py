@@ -16,7 +16,7 @@ def generate_id() -> str:
     return str(int(time.time() * 1000))
 
 
-def append_to_inbox(text: str, inbox_path: Path) -> str:
+def append_to_inbox(text: str, inbox_path: Path, source: str = "cli") -> str:
     """
     Append raw text to inbox.log with timestamp.
 
@@ -28,6 +28,7 @@ def append_to_inbox(text: str, inbox_path: Path) -> str:
     Args:
         text: The raw thought to capture
         inbox_path: Path to inbox.log
+        source: Source of the thought (cli, telegram, api, etc.)
 
     Returns:
         The generated entry ID
@@ -35,9 +36,9 @@ def append_to_inbox(text: str, inbox_path: Path) -> str:
     entry_id = generate_id()
     timestamp = datetime.now(timezone.utc).isoformat()
 
-    # Tab-separated: id, timestamp, text (newlines in text become \n literal)
+    # Tab-separated: id, timestamp, source, text (newlines in text become \n literal)
     escaped_text = text.replace("\n", "\\n").replace("\t", "\\t")
-    line = f"{entry_id}\t{timestamp}\t{escaped_text}\n"
+    line = f"{entry_id}\t{timestamp}\t{source}\t{escaped_text}\n"
 
     # Ensure parent directory exists
     inbox_path.parent.mkdir(parents=True, exist_ok=True)

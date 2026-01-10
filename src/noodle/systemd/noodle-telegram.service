@@ -1,0 +1,14 @@
+[Unit]
+Description=Noodle Telegram Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/noodle telegram
+Environment="PATH=%h/.local/bin:/usr/bin"
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
