@@ -2,7 +2,22 @@
 
 > Local-first second brain for Arch Linux.
 
-A cognitive augmentation system that captures thoughts with zero friction and surfaces them when relevant.
+Your brain is a leaky bucket. Thoughts appear at inconvenient times — in the shower, mid-conversation, at 3am — and vanish just as quickly. Noodle is the patch.
+
+Noodle is a personal knowledge capture system built for the command line. It's designed around one radical idea: **the moment of capture should require zero cognitive effort**. No apps to open, no categories to choose, no forms to fill. Just type `noodle "thought"` and it's saved. Everything else happens later, automatically.
+
+An LLM classifier sorts your raw thoughts into four buckets — tasks, ideas, people, and events. A daily digest surfaces what's relevant. A Telegram bot lets you capture from anywhere. The system runs entirely on your machine, your data never leaves your control, and the whole thing integrates seamlessly with Claude Code via MCP.
+
+## Features
+
+- **Instant Capture** — Sub-100ms command-line capture. No decisions, no friction.
+- **Automatic Classification** — LLM sorts thoughts into tasks, ideas, people, and events.
+- **Daily Digests** — The system tells you what matters each morning.
+- **Full-Text Search** — Find anything you've ever captured.
+- **Mobile Ingress** — Telegram bot for capturing thoughts from your phone.
+- **Claude Code Integration** — MCP server exposes your brain to AI assistants.
+- **Background Processing** — systemd units handle classification and notifications.
+- **Local-First** — SQLite database, no cloud dependencies, your data stays yours.
 
 ## Philosophy
 
