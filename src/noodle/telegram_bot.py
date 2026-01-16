@@ -1,7 +1,7 @@
 """
 Telegram bot for Noodle.
 
-Mobile ingress: capture thoughts from anywhere via Telegram.
+Mobile ingress and remote access via Telegram.
 """
 
 import logging
@@ -19,6 +19,8 @@ from telegram.ext import (
 
 from noodle.config import ensure_dirs, get_inbox_path, load_config
 from noodle.ingress import append_to_inbox
+from noodle.db import Database
+from noodle.surfacing import format_id
 
 # Configure logging
 logging.basicConfig(
@@ -62,6 +64,30 @@ def is_authorized(user_id: int, authorized_users: set[int]) -> bool:
     return user_id in authorized_users
 
 
+def format_entries_telegram(entries: list[dict], title: str, limit: int = 10) -> str:
+    """Format entries for Telegram (plain text, compact)."""
+    if not entries:
+        return f"{title}\n\nNo entries found."
+
+    lines = [f"{title}", ""]
+
+    for entry in entries[:limit]:
+        seq = entry.get("seq", "?")
+        etype = entry["type"]
+        entry_title = entry["title"][:40]
+
+        extra = ""
+        if etype == "task" and entry.get("due_date"):
+            extra = f" [due:{entry['due_date']}]"
+
+        lines.append(f"#{seq} [{etype}] {entry_title}{extra}")
+
+    if len(entries) > limit:
+        lines.append(f"\n... and {len(entries) - limit} more")
+
+    return "\n".join(lines)
+
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command."""
     if not update.effective_user:
@@ -72,9 +98,17 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     if is_authorized(user_id, authorized_users):
         await update.message.reply_text(
-            "Noodle bot ready. Send me any message to capture it.\n\n"
+            "Noodle bot ready. Send any message to capture it.\n\n"
             "Commands:\n"
-            "/start - Show this message\n"
+            "/tasks - List open tasks\n"
+            "/thoughts - List recent thoughts\n"
+            "/list [type] - List entries\n"
+            "/done <id> - Complete a task\n"
+            "/archive <id> - Archive an entry\n"
+            "/find <query> - Search entries\n"
+            "/digest - Daily digest\n"
+            "/analyze - Daily digest with LLM analysis\n"
+            "/weekly - Weekly review\n"
             "/id - Show your user ID"
         )
     else:
@@ -91,6 +125,28 @@ async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     user_id = update.effective_user.id
     await update.message.reply_text(f"Your Telegram user ID: {user_id}")
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /help command."""
+    if not update.effective_user:
+        return
+
+    await update.message.reply_text(
+        "Noodle Commands:\n\n"
+        "/tasks - List open tasks\n"
+        "/thoughts - List recent thoughts\n"
+        "/list [type] - List entries\n"
+        "/done <id> - Complete a task\n"
+        "/archive <id> - Archive an entry\n"
+        "/find <query> - Search entries\n"
+        "/digest - Daily digest\n"
+        "/analyze - Daily digest with LLM analysis\n"
+        "/weekly - Weekly review\n"
+        "/id - Show your user ID\n"
+        "/help - Show this message\n\n"
+        "Send any text to capture it."
+    )
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -127,6 +183,238 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text(f"Error capturing thought: {e}")
 
 
+async def tasks_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /tasks command - list open tasks."""
+    if not update.effective_user:
+        return
+
+    user_id = update.effective_user.id
+    authorized_users = context.bot_data.get("authorized_users", set())
+
+    if not is_authorized(user_id, authorized_users):
+        await update.message.reply_text(f"Unauthorized. Your ID: {user_id}")
+        return
+
+    try:
+        db = Database()
+        entries = db.get_entries(entry_type="task", limit=15)
+        response = format_entries_telegram(entries, "TASKS")
+        await update.message.reply_text(response)
+    except Exception as e:
+        await update.message.reply_text(f"Error: {e}")
+
+
+async def thoughts_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /thoughts command - list recent thoughts."""
+    if not update.effective_user:
+        return
+
+    user_id = update.effective_user.id
+    authorized_users = context.bot_data.get("authorized_users", set())
+
+    if not is_authorized(user_id, authorized_users):
+        await update.message.reply_text(f"Unauthorized. Your ID: {user_id}")
+        return
+
+    try:
+        db = Database()
+        entries = db.get_entries(entry_type="thought", limit=15)
+        response = format_entries_telegram(entries, "THOUGHTS")
+        await update.message.reply_text(response)
+    except Exception as e:
+        await update.message.reply_text(f"Error: {e}")
+
+
+async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /list command - list entries with optional type filter."""
+    if not update.effective_user:
+        return
+
+    user_id = update.effective_user.id
+    authorized_users = context.bot_data.get("authorized_users", set())
+
+    if not is_authorized(user_id, authorized_users):
+        await update.message.reply_text(f"Unauthorized. Your ID: {user_id}")
+        return
+
+    # Parse type argument
+    entry_type = None
+    if context.args:
+        entry_type = context.args[0].lower()
+        if entry_type not in ("task", "thought", "person", "event"):
+            await update.message.reply_text(
+                f"Invalid type: {entry_type}\n"
+                "Valid types: task, thought, person, event"
+            )
+            return
+
+    try:
+        db = Database()
+        entries = db.get_entries(entry_type=entry_type, limit=15)
+        title = f"{entry_type.upper()}S" if entry_type else "ENTRIES"
+        response = format_entries_telegram(entries, title)
+        await update.message.reply_text(response)
+    except Exception as e:
+        await update.message.reply_text(f"Error: {e}")
+
+
+async def done_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /done command - complete a task."""
+    if not update.effective_user:
+        return
+
+    user_id = update.effective_user.id
+    authorized_users = context.bot_data.get("authorized_users", set())
+
+    if not is_authorized(user_id, authorized_users):
+        await update.message.reply_text(f"Unauthorized. Your ID: {user_id}")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Usage: /done <id>")
+        return
+
+    identifier = context.args[0]
+
+    try:
+        db = Database()
+        entry_id = db.resolve_entry_id(identifier)
+        if not entry_id:
+            await update.message.reply_text(f"Entry not found: {identifier}")
+            return
+
+        success = db.complete_task(entry_id)
+        if success:
+            await update.message.reply_text(f"Completed: #{identifier}")
+        else:
+            await update.message.reply_text(f"Not a task or already completed: {identifier}")
+    except Exception as e:
+        await update.message.reply_text(f"Error: {e}")
+
+
+async def archive_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /archive command - archive an entry."""
+    if not update.effective_user:
+        return
+
+    user_id = update.effective_user.id
+    authorized_users = context.bot_data.get("authorized_users", set())
+
+    if not is_authorized(user_id, authorized_users):
+        await update.message.reply_text(f"Unauthorized. Your ID: {user_id}")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Usage: /archive <id>")
+        return
+
+    identifier = context.args[0]
+
+    try:
+        db = Database()
+        entry_id = db.resolve_entry_id(identifier)
+        if not entry_id:
+            await update.message.reply_text(f"Entry not found: {identifier}")
+            return
+
+        success = db.archive_entry(entry_id)
+        if success:
+            await update.message.reply_text(f"Archived: #{identifier}")
+        else:
+            await update.message.reply_text(f"Already archived: {identifier}")
+    except Exception as e:
+        await update.message.reply_text(f"Error: {e}")
+
+
+async def find_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /find command - search entries."""
+    if not update.effective_user:
+        return
+
+    user_id = update.effective_user.id
+    authorized_users = context.bot_data.get("authorized_users", set())
+
+    if not is_authorized(user_id, authorized_users):
+        await update.message.reply_text(f"Unauthorized. Your ID: {user_id}")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Usage: /find <query>")
+        return
+
+    query = " ".join(context.args)
+
+    try:
+        db = Database()
+        entries = db.search(query, limit=10)
+        response = format_entries_telegram(entries, f"SEARCH: {query}")
+        await update.message.reply_text(response)
+    except Exception as e:
+        await update.message.reply_text(f"Error: {e}")
+
+
+async def digest_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /digest command - show daily digest."""
+    if not update.effective_user:
+        return
+
+    user_id = update.effective_user.id
+    authorized_users = context.bot_data.get("authorized_users", set())
+
+    if not is_authorized(user_id, authorized_users):
+        await update.message.reply_text(f"Unauthorized. Your ID: {user_id}")
+        return
+
+    try:
+        from noodle.surfacing import generate_daily_digest
+        digest = generate_daily_digest()
+        await update.message.reply_text(digest)
+    except Exception as e:
+        await update.message.reply_text(f"Error: {e}")
+
+
+async def analyze_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /analyze command - show daily digest with LLM analysis."""
+    if not update.effective_user:
+        return
+
+    user_id = update.effective_user.id
+    authorized_users = context.bot_data.get("authorized_users", set())
+
+    if not is_authorized(user_id, authorized_users):
+        await update.message.reply_text(f"Unauthorized. Your ID: {user_id}")
+        return
+
+    try:
+        from noodle.surfacing import generate_daily_digest_enhanced
+        # Notify user this may take a moment
+        await update.message.reply_text("Analyzing...")
+        digest = generate_daily_digest_enhanced()
+        await update.message.reply_text(digest)
+    except Exception as e:
+        await update.message.reply_text(f"Error: {e}")
+
+
+async def weekly_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /weekly command - show weekly review."""
+    if not update.effective_user:
+        return
+
+    user_id = update.effective_user.id
+    authorized_users = context.bot_data.get("authorized_users", set())
+
+    if not is_authorized(user_id, authorized_users):
+        await update.message.reply_text(f"Unauthorized. Your ID: {user_id}")
+        return
+
+    try:
+        from noodle.surfacing import generate_weekly_review
+        review = generate_weekly_review()
+        await update.message.reply_text(review)
+    except Exception as e:
+        await update.message.reply_text(f"Error: {e}")
+
+
 def run_bot() -> None:
     """Run the Telegram bot."""
     config = get_bot_config()
@@ -139,7 +427,17 @@ def run_bot() -> None:
 
     # Add handlers
     app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("id", id_command))
+    app.add_handler(CommandHandler("tasks", tasks_command))
+    app.add_handler(CommandHandler("thoughts", thoughts_command))
+    app.add_handler(CommandHandler("list", list_command))
+    app.add_handler(CommandHandler("done", done_command))
+    app.add_handler(CommandHandler("archive", archive_command))
+    app.add_handler(CommandHandler("find", find_command))
+    app.add_handler(CommandHandler("digest", digest_command))
+    app.add_handler(CommandHandler("analyze", analyze_command))
+    app.add_handler(CommandHandler("weekly", weekly_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     # Log startup info

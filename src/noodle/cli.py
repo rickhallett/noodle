@@ -36,11 +36,12 @@ Commands:
     noodle done <id>              Mark a task as completed
     noodle archive <id>           Archive any entry (hide from default list)
     noodle retype <id> <type>     Change entry type
-    noodle digest                 Show daily digest
+    noodle digest [--analyze]     Show daily digest (--analyze adds LLM insights)
     noodle weekly                 Show weekly review
     noodle review                 Interactive review of pending items
     noodle health                 System health check
     noodle gc                     Garbage collection
+    noodle context [tag]          Export tagged entries for dev tools (default: #dev)
     noodle process-inbox          Process inbox through classifier
     noodle stats                  Show database statistics
     noodle telegram               Run Telegram bot
@@ -56,7 +57,8 @@ Examples:
     noodle find "redis caching"
     noodle done abc123
     noodle archive abc123
-    noodle digest
+    noodle digest --analyze
+    noodle context dev             Export #dev tagged entries for Claude Code
 
 The thought is captured instantly. Classification happens async.
 No decisions required at capture time.""")
@@ -335,12 +337,17 @@ def cmd_archive(args: list[str]) -> int:
         return 1
 
 
-def cmd_digest() -> int:
+def cmd_digest(args: list[str]) -> int:
     """Show daily digest."""
-    from noodle.surfacing import generate_daily_digest
+    analyze = "--analyze" in args or "-a" in args
 
     try:
-        digest = generate_daily_digest()
+        if analyze:
+            from noodle.surfacing import generate_daily_digest_enhanced
+            digest = generate_daily_digest_enhanced()
+        else:
+            from noodle.surfacing import generate_daily_digest
+            digest = generate_daily_digest()
         print(digest)
         return 0
     except Exception as e:
@@ -455,6 +462,38 @@ def cmd_review() -> int:
             print("→ event\n")
 
     return 0
+
+
+def cmd_context(args: list[str]) -> int:
+    """Generate dev context from tagged entries."""
+    from noodle.surfacing import generate_dev_context
+
+    # Parse arguments
+    tag = "dev"
+    output_format = "markdown"
+
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg in ("--tag", "-t") and i + 1 < len(args):
+            tag = args[i + 1]
+            i += 2
+        elif arg == "--json":
+            output_format = "json"
+            i += 1
+        elif not arg.startswith("-"):
+            tag = arg
+            i += 1
+        else:
+            i += 1
+
+    try:
+        context = generate_dev_context(tag=tag, format=output_format)
+        print(context)
+        return 0
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
 
 
 def cmd_gc() -> int:
@@ -578,7 +617,7 @@ def main() -> int:
         return cmd_archive(args[1:])
 
     if first_arg == "digest":
-        return cmd_digest()
+        return cmd_digest(args[1:])
 
     if first_arg == "weekly":
         return cmd_weekly()
@@ -594,6 +633,9 @@ def main() -> int:
 
     if first_arg == "gc":
         return cmd_gc()
+
+    if first_arg == "context":
+        return cmd_context(args[1:])
 
     if first_arg == "install-systemd":
         return cmd_install_systemd()
