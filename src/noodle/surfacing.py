@@ -4,10 +4,75 @@ Surfacing module for Noodle.
 Push-first architecture: proactively surface relevant information.
 """
 
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from noodle.db import Database
+
+
+# ANSI color codes
+class Colors:
+    """ANSI color codes for terminal output."""
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+
+    # Foreground colors
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+    MAGENTA = "\033[35m"
+    CYAN = "\033[36m"
+    WHITE = "\033[37m"
+
+    # Bright foreground colors
+    BRIGHT_BLACK = "\033[90m"  # Gray
+    BRIGHT_RED = "\033[91m"
+    BRIGHT_GREEN = "\033[92m"
+    BRIGHT_YELLOW = "\033[93m"
+    BRIGHT_BLUE = "\033[94m"
+    BRIGHT_MAGENTA = "\033[95m"
+    BRIGHT_CYAN = "\033[96m"
+
+    @classmethod
+    def enabled(cls) -> bool:
+        """Check if colors should be enabled."""
+        # Disable if NO_COLOR is set or not a tty
+        if os.environ.get("NO_COLOR"):
+            return False
+        return True
+
+
+def c(text: str, *codes: str) -> str:
+    """Apply color codes to text if colors are enabled."""
+    if not Colors.enabled():
+        return text
+    return "".join(codes) + text + Colors.RESET
+
+
+# Type colors
+TYPE_COLORS = {
+    "task": Colors.BRIGHT_YELLOW,
+    "thought": Colors.BRIGHT_CYAN,
+    "person": Colors.BRIGHT_MAGENTA,
+    "event": Colors.BRIGHT_GREEN,
+}
+
+
+def format_id(entry_id: str) -> str:
+    """Format entry ID with hyphens for readability (4-3-3-3 pattern)."""
+    # Remove any existing hyphens first
+    clean = entry_id.replace("-", "")
+    # Format as 4-3-3-3 (e.g., 1768-427-187-928)
+    if len(clean) >= 13:
+        return f"{clean[:4]}-{clean[4:7]}-{clean[7:10]}-{clean[10:]}"
+    elif len(clean) >= 10:
+        return f"{clean[:4]}-{clean[4:7]}-{clean[7:]}"
+    elif len(clean) >= 7:
+        return f"{clean[:4]}-{clean[4:]}"
+    return clean
 
 
 def generate_daily_digest(db: Database | None = None) -> str:
@@ -221,51 +286,86 @@ def get_entries_formatted(
     project: str | None = None,
     limit: int = 20,
     include_completed: bool = False,
+    include_archived: bool = False,
 ) -> str:
-    """Get entries as formatted string."""
+    """Get entries as formatted string with colors."""
     db = db or Database()
     entries = db.get_entries(
         entry_type=entry_type,
         project=project,
         limit=limit,
         include_completed=include_completed,
+        include_archived=include_archived,
     )
 
     if not entries:
-        return "No entries found."
+        return c("No entries found.", Colors.DIM)
 
     lines = []
+
+    # Header
+    header_text = "ENTRIES"
+    if entry_type:
+        header_text = f"{entry_type.upper()}S"
+    lines.append(c(f"━━━ {header_text} ━━━", Colors.BOLD, Colors.BLUE))
+    lines.append("")
+
+    # Column header
+    lines.append(c(f"{'#':>4}  {'ID':16}  {'TYPE':8}  TITLE", Colors.DIM))
+    lines.append(c("─" * 70, Colors.DIM))
+
     for entry in entries:
-        # Format: ID  TYPE  TITLE  [DUE/COMPLETED]
-        entry_id = entry["id"]
-        entry_type = entry["type"]
-        title = entry["title"][:50]
+        seq = entry.get("seq", "?")
+        full_id = format_id(entry["id"])
+        etype = entry["type"]
+        title = entry["title"][:42]
+        type_color = TYPE_COLORS.get(etype, "")
 
         extra = ""
-        if entry["type"] == "task":
+        if etype == "task":
             if entry["completed_at"]:
-                extra = " [done]"
+                extra = c(" [done]", Colors.GREEN)
             elif entry["due_date"]:
-                extra = f" [due:{entry['due_date']}]"
+                extra = c(f" [due:{entry['due_date']}]", Colors.YELLOW)
 
-        lines.append(f"{entry_id}  {entry_type:8}  {title}{extra}")
+        seq_str = c(f"{seq:>4}", Colors.BOLD, Colors.WHITE)
+        id_str = c(full_id, Colors.DIM)
+        type_str = c(f"{etype:8}", type_color)
+
+        lines.append(f"{seq_str}  {id_str}  {type_str}  {title}{extra}")
 
     return "\n".join(lines)
 
 
 def search_entries_formatted(query: str, db: Database | None = None, limit: int = 20) -> str:
-    """Search entries and return formatted string."""
+    """Search entries and return formatted string with colors."""
     db = db or Database()
     entries = db.search(query, limit=limit)
 
     if not entries:
-        return f"No entries matching '{query}'."
+        return c(f"No entries matching '{query}'.", Colors.DIM)
 
     lines = []
+
+    # Header
+    lines.append(c(f"━━━ SEARCH: {query} ━━━", Colors.BOLD, Colors.BLUE))
+    lines.append("")
+
+    # Column header
+    lines.append(c(f"{'#':>4}  {'ID':16}  {'TYPE':8}  TITLE", Colors.DIM))
+    lines.append(c("─" * 70, Colors.DIM))
+
     for entry in entries:
-        entry_id = entry["id"]
-        entry_type = entry["type"]
-        title = entry["title"][:50]
-        lines.append(f"{entry_id}  {entry_type:8}  {title}")
+        seq = entry.get("seq", "?")
+        full_id = format_id(entry["id"])
+        etype = entry["type"]
+        title = entry["title"][:42]
+        type_color = TYPE_COLORS.get(etype, "")
+
+        seq_str = c(f"{seq:>4}", Colors.BOLD, Colors.WHITE)
+        id_str = c(full_id, Colors.DIM)
+        type_str = c(f"{etype:8}", type_color)
+
+        lines.append(f"{seq_str}  {id_str}  {type_str}  {title}")
 
     return "\n".join(lines)

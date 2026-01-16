@@ -13,7 +13,7 @@ from typing import Any, Iterator
 from noodle.config import get_db_path, get_noodle_home
 
 # Schema version for migrations
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3
 
 SCHEMA = """
 -- Schema version tracking
@@ -38,7 +38,9 @@ CREATE TABLE IF NOT EXISTS entries (
     source TEXT DEFAULT 'cli',              -- cli, telegram, api, etc.
     raw_input TEXT NOT NULL,                -- Original unprocessed text
     markdown_path TEXT,                     -- Path to .md file if exists
-    needs_reclassification INTEGER DEFAULT 0
+    needs_reclassification INTEGER DEFAULT 0,
+    archived_at TEXT,                       -- ISO 8601, NULL if not archived
+    seq INTEGER UNIQUE                      -- Auto-incrementing shorthand ID
 );
 
 -- Projects
@@ -108,6 +110,8 @@ CREATE INDEX IF NOT EXISTS idx_entries_project ON entries(project_id);
 CREATE INDEX IF NOT EXISTS idx_entries_due_date ON entries(due_date);
 CREATE INDEX IF NOT EXISTS idx_entries_created ON entries(created_at);
 CREATE INDEX IF NOT EXISTS idx_entries_needs_reclass ON entries(needs_reclassification);
+CREATE INDEX IF NOT EXISTS idx_entries_archived ON entries(archived_at);
+CREATE INDEX IF NOT EXISTS idx_entries_seq ON entries(seq);
 
 -- FTS triggers
 CREATE TRIGGER IF NOT EXISTS entries_ai AFTER INSERT ON entries BEGIN
@@ -135,13 +139,65 @@ class Database:
     def _ensure_db(self) -> None:
         """Ensure database exists and schema is current."""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Run migrations first (for existing databases)
+        self._migrate()
+
         with self._connect() as conn:
             conn.executescript(SCHEMA)
+
             # Set schema version
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
                 (SCHEMA_VERSION,)
             )
+
+    def _migrate(self) -> None:
+        """Run database migrations."""
+        if not self.db_path.exists():
+            return  # Fresh database, no migrations needed
+
+        conn = sqlite3.connect(self.db_path)
+        try:
+            # Check current version
+            try:
+                current = conn.execute(
+                    "SELECT version FROM schema_version"
+                ).fetchone()
+                current_version = current[0] if current else 0
+            except sqlite3.OperationalError:
+                current_version = 0
+
+            # Get current columns once
+            columns = [
+                row[1] for row in
+                conn.execute("PRAGMA table_info(entries)").fetchall()
+            ]
+
+            # Migration: v1 -> v2: Add archived_at column
+            if current_version < 2:
+                if "archived_at" not in columns:
+                    conn.execute("ALTER TABLE entries ADD COLUMN archived_at TEXT")
+                    conn.commit()
+                    columns.append("archived_at")
+
+            # Migration: v2 -> v3: Add seq column with auto-incrementing values
+            if current_version < 3:
+                if "seq" not in columns:
+                    conn.execute("ALTER TABLE entries ADD COLUMN seq INTEGER")
+                    # Populate seq for existing entries ordered by created_at
+                    conn.execute("""
+                        UPDATE entries SET seq = (
+                            SELECT COUNT(*) FROM entries e2
+                            WHERE e2.created_at <= entries.created_at
+                            AND (e2.created_at < entries.created_at OR e2.id <= entries.id)
+                        )
+                    """)
+                    # Create unique index separately
+                    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_entries_seq_unique ON entries(seq)")
+                    conn.commit()
+        finally:
+            conn.close()
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -171,12 +227,16 @@ class Database:
                     VALUES (?, ?, ?, ?)
                 """, (project_id, project_id.replace("-", " ").title(), now, now))
 
+            # Get next seq number
+            max_seq = conn.execute("SELECT MAX(seq) FROM entries").fetchone()[0]
+            next_seq = (max_seq or 0) + 1
+
             conn.execute("""
                 INSERT INTO entries (
                     id, created_at, updated_at, type, title, body,
                     confidence, priority, due_date, project_id,
-                    source, raw_input, needs_reclassification
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    source, raw_input, needs_reclassification, seq
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 entry["id"],
                 entry.get("created_at", now),
@@ -191,6 +251,7 @@ class Database:
                 entry.get("source", "cli"),
                 entry["raw_input"],
                 entry.get("needs_reclassification", 0),
+                next_seq,
             ))
 
             # Handle tags
@@ -250,6 +311,37 @@ class Database:
                 llm_model, confidence, processing_time_ms, status, routed_to
             ))
 
+    def resolve_entry_id(self, identifier: str) -> str | None:
+        """
+        Resolve an entry identifier to its full ID.
+
+        Accepts either:
+        - Full timestamp ID (13 digits, with or without hyphens)
+        - Shorthand seq number (smaller integer)
+
+        Returns the full ID or None if not found.
+        """
+        # Strip hyphens
+        clean = identifier.replace("-", "")
+
+        with self._connect() as conn:
+            # If it's a short number, treat as seq
+            if clean.isdigit() and len(clean) < 10:
+                row = conn.execute(
+                    "SELECT id FROM entries WHERE seq = ?", (int(clean),)
+                ).fetchone()
+                if row:
+                    return row[0]
+
+            # Otherwise treat as full ID
+            row = conn.execute(
+                "SELECT id FROM entries WHERE id = ?", (clean,)
+            ).fetchone()
+            if row:
+                return row[0]
+
+        return None
+
     def get_entry(self, entry_id: str) -> dict[str, Any] | None:
         """Get a single entry by ID."""
         with self._connect() as conn:
@@ -266,6 +358,7 @@ class Database:
         project: str | None = None,
         limit: int = 20,
         include_completed: bool = False,
+        include_archived: bool = False,
     ) -> list[dict[str, Any]]:
         """Get entries with optional filters."""
         query = "SELECT * FROM entries WHERE 1=1"
@@ -281,6 +374,9 @@ class Database:
 
         if not include_completed:
             query += " AND (completed_at IS NULL OR type != 'task')"
+
+        if not include_archived:
+            query += " AND archived_at IS NULL"
 
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
@@ -310,6 +406,18 @@ class Database:
                 UPDATE entries
                 SET completed_at = ?, updated_at = ?
                 WHERE id = ? AND type = 'task' AND completed_at IS NULL
+            """, (now, now, entry_id))
+            return cursor.rowcount > 0
+
+    def archive_entry(self, entry_id: str) -> bool:
+        """Archive an entry. Returns True if successful."""
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self._connect() as conn:
+            cursor = conn.execute("""
+                UPDATE entries
+                SET archived_at = ?, updated_at = ?, needs_reclassification = 0
+                WHERE id = ? AND archived_at IS NULL
             """, (now, now, entry_id))
             return cursor.rowcount > 0
 

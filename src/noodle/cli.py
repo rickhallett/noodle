@@ -13,6 +13,16 @@ Usage:
 import sys
 
 
+def resolve_id(identifier: str) -> str | None:
+    """
+    Resolve entry identifier (seq number or full ID) to full ID.
+    Returns None if not found.
+    """
+    from noodle.db import Database
+    db = Database()
+    return db.resolve_entry_id(identifier)
+
+
 def print_help() -> None:
     """Print help message."""
     print("""noodle - local-first second brain
@@ -21,9 +31,10 @@ Usage:
     noodle "your thought here"    Capture a thought (O(1) ingress)
 
 Commands:
-    noodle list [options]         List entries (--type, --project, --all)
+    noodle list [options]         List entries (--type, --project, --all, --archived)
     noodle find <query>           Full-text search
     noodle done <id>              Mark a task as completed
+    noodle archive <id>           Archive any entry (hide from default list)
     noodle retype <id> <type>     Change entry type
     noodle digest                 Show daily digest
     noodle weekly                 Show weekly review
@@ -44,6 +55,7 @@ Examples:
     noodle list --type task
     noodle find "redis caching"
     noodle done abc123
+    noodle archive abc123
     noodle digest
 
 The thought is captured instantly. Classification happens async.
@@ -214,6 +226,7 @@ def cmd_list(args: list[str]) -> int:
     entry_type = None
     project = None
     include_completed = False
+    include_archived = False
 
     # Parse arguments
     i = 0
@@ -227,6 +240,10 @@ def cmd_list(args: list[str]) -> int:
             i += 2
         elif arg in ("--all", "-a"):
             include_completed = True
+            include_archived = True
+            i += 1
+        elif arg == "--archived":
+            include_archived = True
             i += 1
         else:
             i += 1
@@ -236,6 +253,7 @@ def cmd_list(args: list[str]) -> int:
             entry_type=entry_type,
             project=project,
             include_completed=include_completed,
+            include_archived=include_archived,
         )
         print(result)
         return 0
@@ -271,7 +289,10 @@ def cmd_done(args: list[str]) -> int:
         print("Usage: noodle done <id>", file=sys.stderr)
         return 1
 
-    entry_id = args[0]
+    entry_id = resolve_id(args[0])
+    if not entry_id:
+        print(f"Entry not found: {args[0]}", file=sys.stderr)
+        return 1
 
     try:
         db = Database()
@@ -280,7 +301,34 @@ def cmd_done(args: list[str]) -> int:
             print(f"Completed: {entry_id}")
             return 0
         else:
-            print(f"Not found or not a task: {entry_id}", file=sys.stderr)
+            print(f"Not a task or already completed: {entry_id}", file=sys.stderr)
+            return 1
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_archive(args: list[str]) -> int:
+    """Archive an entry."""
+    from noodle.db import Database
+
+    if not args:
+        print("Usage: noodle archive <id>", file=sys.stderr)
+        return 1
+
+    entry_id = resolve_id(args[0])
+    if not entry_id:
+        print(f"Entry not found: {args[0]}", file=sys.stderr)
+        return 1
+
+    try:
+        db = Database()
+        success = db.archive_entry(entry_id)
+        if success:
+            print(f"Archived: {entry_id}")
+            return 0
+        else:
+            print(f"Already archived: {entry_id}", file=sys.stderr)
             return 1
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -331,7 +379,11 @@ def cmd_retype(args: list[str]) -> int:
         print("Types: task, thought, person, event", file=sys.stderr)
         return 1
 
-    entry_id = args[0]
+    entry_id = resolve_id(args[0])
+    if not entry_id:
+        print(f"Entry not found: {args[0]}", file=sys.stderr)
+        return 1
+
     new_type = args[1]
 
     if new_type not in ("task", "thought", "person", "event"):
@@ -346,7 +398,7 @@ def cmd_retype(args: list[str]) -> int:
             print(f"Retyped: {entry_id} → {new_type}")
             return 0
         else:
-            print(f"Entry not found: {entry_id}", file=sys.stderr)
+            print(f"Failed to retype: {entry_id}", file=sys.stderr)
             return 1
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -356,31 +408,39 @@ def cmd_retype(args: list[str]) -> int:
 def cmd_review() -> int:
     """Interactive review of pending items."""
     from noodle.db import Database
+    from noodle.surfacing import format_id, c, Colors, TYPE_COLORS
 
     db = Database()
     entries = db.get_pending_reclassification()
 
     if not entries:
-        print("No entries pending review.")
+        print(c("No entries pending review.", Colors.DIM))
         return 0
 
-    print(f"Pending review: {len(entries)} items\n")
+    print(c(f"━━━ REVIEW ({len(entries)} pending) ━━━", Colors.BOLD, Colors.BLUE))
+    print()
 
     for entry in entries:
-        print(f"ID: {entry['id']}")
-        print(f"Current: {entry['type']}")
-        print(f"Title: {entry['title']}")
+        seq = entry.get("seq", "?")
+        type_color = TYPE_COLORS.get(entry['type'], "")
+
+        print(c(f"#{seq}", Colors.BOLD, Colors.WHITE) + "  " + c(format_id(entry['id']), Colors.DIM))
+        print(f"Type: {c(entry['type'], type_color)}")
+        print(f"Title: {c(entry['title'], Colors.BOLD)}")
         if entry.get('body'):
             print(f"Body: {entry['body'][:100]}...")
         print()
 
         # Prompt for action
-        action = input("[t]ask [h]ought [p]erson [e]vent [s]kip [q]uit: ").strip().lower()
+        action = input(c("[t]ask [h]ought [p]erson [e]vent [a]rchive [s]kip [q]uit: ", Colors.DIM)).strip().lower()
 
         if action == 'q':
             break
         elif action == 's':
             continue
+        elif action in ('a', 'archive'):
+            db.archive_entry(entry['id'])
+            print("→ archived\n")
         elif action in ('t', 'task'):
             db.update_entry_type(entry['id'], 'task')
             print("→ task\n")
@@ -513,6 +573,9 @@ def main() -> int:
 
     if first_arg == "done":
         return cmd_done(args[1:])
+
+    if first_arg == "archive":
+        return cmd_archive(args[1:])
 
     if first_arg == "digest":
         return cmd_digest()
