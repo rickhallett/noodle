@@ -76,6 +76,20 @@ uv run pytest        # Run tests
 /atomic-commit       # Claude command for focused commits
 ```
 
+## CLI Parameter Shortcuts
+
+Commands support short flags for common options:
+
+| Command | Long | Short | Description |
+|---------|------|-------|-------------|
+| list | --type | -t | Filter by type |
+| list | --project | -p | Filter by project |
+| list | --all | -a | Include completed/archived |
+| digest | --analyze | -a | Add LLM insights |
+| context | --tag | -t | Tag to export |
+| global | --help | -h | Show help |
+| global | --version | -v | Show version |
+
 ## Commit Style
 
 Use atomic commits with conventional format:

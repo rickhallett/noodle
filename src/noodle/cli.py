@@ -25,43 +25,60 @@ def resolve_id(identifier: str) -> str | None:
 
 def print_help() -> None:
     """Print help message."""
-    print("""noodle - local-first second brain
+    from noodle.surfacing import c, Colors
 
-Usage:
-    noodle "your thought here"    Capture a thought (O(1) ingress)
+    # Header
+    print(c("noodle", Colors.BOLD, Colors.BRIGHT_CYAN) + c(" — local-first second brain", Colors.DIM))
+    print()
 
-Commands:
-    noodle list [options]         List entries (--type, --project, --all, --archived)
-    noodle find <query>           Full-text search
-    noodle done <id>              Mark a task as completed
-    noodle archive <id>           Archive any entry (hide from default list)
-    noodle retype <id> <type>     Change entry type
-    noodle digest [--analyze]     Show daily digest (--analyze adds LLM insights)
-    noodle weekly                 Show weekly review
-    noodle review                 Interactive review of pending items
-    noodle health                 System health check
-    noodle gc                     Garbage collection
-    noodle context [tag]          Export tagged entries for dev tools (default: #dev)
-    noodle process-inbox          Process inbox through classifier
-    noodle stats                  Show database statistics
-    noodle telegram               Run Telegram bot
-    noodle install-systemd        Install systemd user units
+    # Usage
+    print(c("USAGE", Colors.BOLD, Colors.WHITE))
+    print(f"  noodle {c('"your thought here"', Colors.GREEN)}    Capture a thought (O(1) ingress)")
+    print()
 
-Options:
-    noodle --help, -h             Show this help
-    noodle --version, -v          Show version
+    # Commands
+    print(c("COMMANDS", Colors.BOLD, Colors.WHITE))
+    print(f"  {c('list', Colors.BRIGHT_YELLOW)} {c('[options]', Colors.DIM)}         List entries")
+    print(f"      {c('-t, --type', Colors.CYAN)} <type>     Filter by type (task/thought/person/event)")
+    print(f"      {c('-p, --project', Colors.CYAN)} <name>  Filter by project")
+    print(f"      {c('-a, --all', Colors.CYAN)}             Include completed and archived")
+    print(f"      {c('--archived', Colors.CYAN)}            Include archived only")
+    print(f"  {c('find', Colors.BRIGHT_YELLOW)} {c('<query>', Colors.DIM)}           Full-text search")
+    print(f"  {c('done', Colors.BRIGHT_YELLOW)} {c('<id>', Colors.DIM)}              Mark a task as completed")
+    print(f"  {c('archive', Colors.BRIGHT_YELLOW)} {c('<id>', Colors.DIM)}           Archive any entry (hide from default list)")
+    print(f"  {c('retype', Colors.BRIGHT_YELLOW)} {c('<id> <type>', Colors.DIM)}     Change entry type")
+    print(f"  {c('digest', Colors.BRIGHT_YELLOW)} {c('[options]', Colors.DIM)}       Show daily digest")
+    print(f"      {c('-a, --analyze', Colors.CYAN)}          Add LLM insights")
+    print(f"  {c('weekly', Colors.BRIGHT_YELLOW)}                   Show weekly review")
+    print(f"  {c('review', Colors.BRIGHT_YELLOW)}                   Interactive review of pending items")
+    print(f"  {c('context', Colors.BRIGHT_YELLOW)} {c('[options]', Colors.DIM)}      Export tagged entries for dev tools")
+    print(f"      {c('-t, --tag', Colors.CYAN)} <tag>       Tag to export (default: dev)")
+    print(f"      {c('--json', Colors.CYAN)}                Output as JSON")
+    print(f"  {c('health', Colors.BRIGHT_YELLOW)}                   System health check")
+    print(f"  {c('gc', Colors.BRIGHT_YELLOW)}                       Garbage collection")
+    print(f"  {c('stats', Colors.BRIGHT_YELLOW)}                    Show database statistics")
+    print(f"  {c('process-inbox', Colors.BRIGHT_YELLOW)}            Process inbox through classifier")
+    print(f"  {c('telegram', Colors.BRIGHT_YELLOW)}                 Run Telegram bot")
+    print(f"  {c('install-systemd', Colors.BRIGHT_YELLOW)}          Install systemd user units")
+    print()
 
-Examples:
-    noodle "Remember to email Sarah"
-    noodle list --type task
-    noodle find "redis caching"
-    noodle done abc123
-    noodle archive abc123
-    noodle digest --analyze
-    noodle context dev             Export #dev tagged entries for Claude Code
+    # Options
+    print(c("OPTIONS", Colors.BOLD, Colors.WHITE))
+    print(f"  {c('-h, --help', Colors.CYAN)}              Show this help")
+    print(f"  {c('-v, --version', Colors.CYAN)}           Show version")
+    print()
 
-The thought is captured instantly. Classification happens async.
-No decisions required at capture time.""")
+    # Examples
+    print(c("EXAMPLES", Colors.BOLD, Colors.WHITE))
+    print(f"  noodle {c('"Remember to email Sarah"', Colors.GREEN)}")
+    print(f"  noodle list {c('-t', Colors.CYAN)} task")
+    print(f"  noodle find {c('"redis caching"', Colors.GREEN)}")
+    print(f"  noodle done {c('abc123', Colors.DIM)}")
+    print(f"  noodle digest {c('-a', Colors.CYAN)}")
+    print(f"  noodle context {c('dev', Colors.DIM)}")
+    print()
+
+    print(c("Capture is instant. Classification happens async.", Colors.DIM))
 
 
 def print_version() -> None:
