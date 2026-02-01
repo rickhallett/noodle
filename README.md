@@ -1,6 +1,14 @@
-# Noodle
+<div align="center">
+  <img src="assets/logo.png" alt="noodle logo" width="200">
+  <h1>noodle</h1>
+  <p><em>Local-first second brain for Arch Linux</em></p>
 
-> Local-first second brain for Arch Linux.
+  ![License](https://img.shields.io/badge/license-MIT-blue)
+  ![Python](https://img.shields.io/badge/python-3.11+-blue)
+  ![Arch Linux](https://img.shields.io/badge/arch-linux-1793D1)
+</div>
+
+---
 
 Your brain is a leaky bucket. Thoughts appear at inconvenient times — in the shower, mid-conversation, at 3am — and vanish just as quickly. Noodle is the patch.
 
