@@ -1,12 +1,16 @@
-<div align="center">
-  <img src="assets/logo.png" alt="noodle logo" width="200">
-  <h1>noodle</h1>
-  <p><em>Local-first second brain for Arch Linux</em></p>
+<p align="center">
+  <img src="assets/social-preview.svg" alt="noodle" width="600"/>
+</p>
 
-  ![License](https://img.shields.io/badge/license-MIT-blue)
-  ![Python](https://img.shields.io/badge/python-3.11+-blue)
-  ![Arch Linux](https://img.shields.io/badge/arch-linux-1793D1)
-</div>
+<p align="center">
+  <em>Telegram capture • CLI tools • Arch Linux native</em>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License"/>
+  <img src="https://img.shields.io/badge/python-3.11+-blue" alt="Python"/>
+  <img src="https://img.shields.io/badge/arch-linux-1793D1" alt="Arch Linux"/>
+</p>
 
 ---
 
