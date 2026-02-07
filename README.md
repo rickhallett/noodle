@@ -12,6 +12,12 @@
   <img src="https://img.shields.io/badge/arch-linux-1793D1" alt="Arch Linux"/>
 </p>
 
+<p align="center">
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#features">Features</a> •
+  <a href="https://tools.oceanheart.ai">all tools</a>
+</p>
+
 ---
 
 Your brain is a leaky bucket. Thoughts appear at inconvenient times — in the shower, mid-conversation, at 3am — and vanish just as quickly. Noodle is the patch.
