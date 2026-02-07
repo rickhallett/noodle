@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640">
+  <defs>
+    <linearGradient id="noodleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9ece6a"/>
+      <stop offset="50%" style="stop-color:#73daca"/>
+      <stop offset="100%" style="stop-color:#b4f9f8"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1280" height="640" fill="#1a1b26"/>
+  
+  <!-- Brain/neural pattern -->
+  <pattern id="neural" width="60" height="60" patternUnits="userSpaceOnUse">
+    <circle cx="30" cy="30" r="1" fill="#24283b"/>
+    <path d="M30 30 Q45 15 60 30 M30 30 Q15 45 0 30 M30 30 Q45 45 60 60 M30 30 Q15 15 0 0" fill="none" stroke="#24283b" stroke-width="0.5"/>
+  </pattern>
+  <rect width="1280" height="640" fill="url(#neural)" opacity="0.4"/>
+  
+  <!-- Decorative corners - Arch Linux style -->
+  <path d="M 40 80 L 40 40 L 80 40" fill="none" stroke="#9ece6a" stroke-width="2"/>
+  <path d="M 1200 40 L 1240 40 L 1240 80" fill="none" stroke="#9ece6a" stroke-width="2"/>
+  <path d="M 40 560 L 40 600 L 80 600" fill="none" stroke="#9ece6a" stroke-width="2"/>
+  <path d="M 1200 600 L 1240 600 L 1240 560" fill="none" stroke="#9ece6a" stroke-width="2"/>
+  
+  <!-- ASCII Art -->
+  <text font-family="'JetBrains Mono', 'Fira Code', monospace" font-size="42" fill="url(#noodleGrad)" font-weight="bold">
+    <tspan x="320" y="200">░█▀█░█▀█░█▀█░█▀▄░█░░░█▀▀</tspan>
+    <tspan x="320" y="255">░█░█░█░█░█░█░█░█░█░░░█▀▀</tspan>
+    <tspan x="320" y="310">░▀░▀░▀▀▀░▀▀▀░▀▀░░▀▀▀░▀▀▀</tspan>
+  </text>
+  
+  <!-- Emoji -->
+  <text x="640" y="400" font-family="system-ui, sans-serif" font-size="72" text-anchor="middle">🍜</text>
+  
+  <!-- Tagline -->
+  <text x="640" y="480" font-family="'JetBrains Mono', monospace" font-size="28" text-anchor="middle" fill="#9ece6a">local-first second brain</text>
+  
+  <!-- Description -->
+  <text x="640" y="530" font-family="'JetBrains Mono', monospace" font-size="18" text-anchor="middle" fill="#565f89">Telegram capture • CLI tools • Arch Linux native</text>
+  
+  <!-- Arch badge -->
+  <rect x="565" y="555" width="150" height="30" rx="15" fill="#9ece6a" opacity="0.15"/>
+  <text x="640" y="576" font-family="'JetBrains Mono', monospace" font-size="14" text-anchor="middle" fill="#9ece6a">Python 3.11+</text>
+</svg>
